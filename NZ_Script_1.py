@@ -10,41 +10,59 @@ UWOID = "5163"
 
 #Merge Bib Processing Reports and dedupe using NZ ID, then split into NZ and IZ reports
 def merge_reports():
-    #Prompt user for .txt files and open both
 
+    #Collect institution data from config files
     with open(constants.INSTITUTIONS_JSON_FILE) as institutions_json:
         institutions = json.load(institutions_json)
 
     columns=["JobID", "Network Id", "Existing 035a", "Incoming 035a", "Action"]
     merged = pd.DataFrame(columns=columns)
 
+    #Read each bibprocessing report in the inputs folder
     for file in os.listdir(constants.INPUT_FOLDER):
+        print(f'1. Opening file {file}...')
         with open(os.path.join(constants.INPUT_FOLDER, file)) as csv:
             df = pd.read_csv(csv, sep="|", header=None, dtype=str, names=columns)
+            print(f'2. {file} read successfully:\n{df}')
 
+        #Add to merged dataframe
         merged = pd.merge(merged, df, how="outer")
+        print("3. Dataframes merged. Deduplicating...")
         merged.drop_duplicates(subset=["Network Id"], keep="first", inplace = True)
+        print("4. Dataframe deduplicated successfully")
         merged["Network Id"] = merged["Network Id"].astype(str)
 
     if merged.empty:
-        raise Exception("Merged DataFrame is empty. Make sure BibProcessing files are in Inputs directory.")
+        raise Exception("4a. Merged DataFrame is empty. Make sure BibProcessing files are in Inputs directory.")
+    
     for library in institutions:
         id = library["id"]
         code = library["code"]
+        print(f'5. Checking for records from {library["name"]}')
 
+        #Separate out IZ records by institution code
         bibprocess = merged[merged['Network Id'].str.endswith(id)]
+        
+        #If report is not empty, save to outputs folder
         if len(bibprocess) > 1:
-            bibprocess_file = os.path.join(constants.OUTPUT_FOLDER, f"{code}{constants.BIBPROCESS_IZ_FILE_NAME}")
-            bibprocess.to_csv(bibprocess_file, mode = "w", index = False)
-            print(f"{code} records saved to {code}{constants.BIBPROCESS_IZ_FILE_NAME}")
+            print(f'6. Records from {library["name"]} found\n{bibprocess}')
+            try:
+                bibprocess_file = os.path.join(constants.OUTPUT_FOLDER, f"{code}{constants.BIBPROCESS_IZ_FILE_NAME}")
+                bibprocess.to_csv(bibprocess_file, mode = "w", index = False)
+                print(f"6a. {code} records saved to {code}{constants.BIBPROCESS_IZ_FILE_NAME}")
+            except Exception as e:
+                print(e)
         else:
+            print(f'6b. No records from {library["name"]} found. Continuing...')
             continue
 
+    #
     nz = merged[merged['Network Id'].str.endswith(NZID)]
+    print("7. Records merged successfully. saving...")
     nz.to_csv(constants.BIBPROCESS_MERGED_FILE, mode = "w", index = False)
-    print(f"NZ records saved to {constants.BIBPROCESS_MERGED_FILE}")
+    print(f"8. NZ records saved to {constants.BIBPROCESS_MERGED_FILE}")
 
-
+#THIS FUNCTION IS AN OLDER VERSION DESIGNED TO ACCEPT TWO FILES THROUGH USER INPUT AND IS NO LONGER USED
 def merge_reports_old():
     messagebox.showinfo(title=None, message='Please select the Bib Processing Reports to load and compare.')
     fn1 = filedialog.askopenfilename()
@@ -83,7 +101,6 @@ def merge_reports_old():
     NZ.to_csv("bibprocessmerged.csv", mode = "w", index = False)
     print("NZ records saved to bibprocessmerged.csv")
 
-
 def compare_OCLC(): #Copied from UWO code
     #Read the BIB processing report. Add the filepath to the txt file
     data = pd.read_csv(constants.BIBPROCESS_MERGED_FILE)
@@ -96,8 +113,8 @@ def compare_OCLC(): #Copied from UWO code
     DIFF = df[df['Existing 035a'] != df['Incoming 035a']]
     SAME = df[df['Existing 035a'] == df['Incoming 035a']]
 
-    print(DIFF)
-    print(SAME)
+    print(f'9. Records with new incoming OCLC numbers identified:\n{DIFF}')
+    print(f'9a. Records with no new incoming OCLC number identified:\n{SAME}')
 
     #Create the comparison_fileIZ file. Add the file path to the Excel file
     writer = pd.ExcelWriter(constants.COMPARISON_FILE, engine='xlsxwriter')
@@ -108,6 +125,7 @@ def compare_OCLC(): #Copied from UWO code
     text_fmt = workbook.add_format({'num_format': '@'})
     worksheet.set_column('B:B',20, text_fmt)
     writer.close()
+    print(f'10. Records requiring updates identified and written to {constants.COMPARISON_FILE}')
 
 def main():
     merge_reports()

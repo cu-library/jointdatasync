@@ -46,3 +46,6 @@ _Updates - September 26, 2025_
 &nbsp;&nbsp;- Combines scripts into one main<br />
 &nbsp;&nbsp;- Uses API calls to NZ Analytics to retrieve OCLC doublecheck report<br />
 &nbsp;&nbsp;- Outputs reports for each CF institution based on the last four digits of the MMS ID
+
+_Updates - October 1, 2025_
+- Added debugging and exception handling to main and NZ Script 1
